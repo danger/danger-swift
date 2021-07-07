@@ -1,5 +1,5 @@
-import DangerShellExecutor
 import Foundation
+import ShellRunner
 
 public struct SPMDanger {
     private static let dangerDepsPrefix = "DangerDeps"
@@ -29,9 +29,11 @@ public struct SPMDanger {
         }
     }
 
-    public func buildDependencies(executor: ShellExecuting = ShellExecutor(),
-                                  fileManager _: FileManager = .default) {
-        executor.execute("swift build", arguments: ["--product \(depsLibName)"])
+    public func buildDependencies(
+        shell: ShellRunnerProtocol = ShellRunner(),
+        fileManager _: FileManager = .default
+    ) {
+        _ = try? shell.run("swift build", arguments: ["--product \(depsLibName)"])
     }
 
     public var swiftcLibImport: String {

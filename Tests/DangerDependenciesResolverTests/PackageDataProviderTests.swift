@@ -1,31 +1,32 @@
 @testable import DangerDependenciesResolver
-import DangerShellExecutor
 import Logger
+import ShellRunner
+import ShellRunnerTestUtils
 import Version
 import XCTest
 
 final class PackageDataProviderTests: XCTestCase {
     var fileReader: StubbedDataReader!
     var packageDataProvider: PackageDataProvider!
-    var executor: MockedExecutor!
+    var shell: ShellRunnerMock!
 
     override func setUp() {
         super.setUp()
         fileReader = StubbedDataReader()
 
-        executor = MockedExecutor()
+        shell = ShellRunnerMock()
 
         packageDataProvider = PackageDataProvider(
             logger: Logger(isVerbose: false, isSilent: false, printer: SpyPrinter()),
             fileReader: fileReader,
-            executor: executor
+            shell: shell
         )
     }
 
     override func tearDown() {
         fileReader = nil
         packageDataProvider = nil
-        executor = nil
+        shell = nil
 
         super.tearDown()
     }
@@ -45,21 +46,21 @@ final class PackageDataProviderTests: XCTestCase {
         }
         let name = try packageDataProvider.nameOfPackage(at: URL(string: "http://url.com/repo.git")!, temporaryFolder: "tmp")
 
-        XCTAssertEqual(executor.receivedCommand, "git clone http://url.com/repo.git --single-branch --depth 1 tmp/Clone -q")
+        XCTAssertEqual(shell.calls, [.run(.init("git clone", ["http://url.com/repo.git", "--single-branch", "--depth 1", "tmp/Clone", "-q"]))])
         XCTAssertEqual(name, "danger-swift")
     }
 
     func testLatestMajorVersionForPackageReturnsCorrectVersion() throws {
-        executor.result = gitLsRemoteTestResponse
+        shell.runReturnValue = gitLsRemoteTestResponse
 
         let version = try packageDataProvider.latestMajorVersionForPackage(at: URL(string: "http://url.com/repo.git")!)
 
-        XCTAssertEqual(executor.receivedCommand, "git ls-remote --tags http://url.com/repo.git")
+        XCTAssertEqual(shell.calls, [.run(.init("git ls-remote", ["--tags", "http://url.com/repo.git"]))])
         XCTAssertEqual(version, 2)
     }
 
     func testLatestMajorVersionForPackageThrowsAnErrorWhenInputIsInvalid() throws {
-        executor.result = ""
+        shell.runReturnValue = ""
 
         XCTAssertThrowsError(try packageDataProvider.latestMajorVersionForPackage(at: URL(string: "http://url.com/repo.git")!))
     }
@@ -223,21 +224,6 @@ final class SpyPrinter: Printing {
 
     func print(_ message: String, terminator _: String) {
         printedMessages.append(message)
-    }
-}
-
-final class MockedExecutor: ShellExecuting {
-    var receivedCommand: String!
-    var result = ""
-
-    func execute(_ command: String, arguments: [String], environmentVariables _: [String: String], outputFile _: String?) -> String {
-        receivedCommand = command + " " + arguments.joined(separator: " ")
-        return result
-    }
-
-    func spawn(_ command: String, arguments: [String], environmentVariables _: [String: String], outputFile _: String?) throws -> String {
-        receivedCommand = command + " " + arguments.joined(separator: " ")
-        return result
     }
 }
 
